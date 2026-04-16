@@ -1,1 +1,363 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// SMYB Problem Tracker — Google Apps Script Backend
+// Deploy come: Web App → Execute as: Me → Who has access: Anyone with the link
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SHEET_ID = '1MnHnvxV-a-fNfa8ymGncMyhgWOeMz-3l7UEw0h0AAsI'; // <-- sostituisci con il tuo ID
+
+const SHEETS = {
+  problemi:  'Problemi',
+  commenti:  'Commenti',
+  risorse:   'Risorse',
+  utenti:    'Utenti',
+  log:       'Log',
+};
+
+// ── JSONP helper ──────────────────────────────────────────────────────────────
+var _callback = '';
+
+function respond(obj) {
+  var json = JSON.stringify(obj);
+  var out  = _callback ? _callback + '(' + json + ')' : json;
+  return ContentService.createTextOutput(out)
+    .setMimeType(_callback ? ContentService.MimeType.JAVASCRIPT : ContentService.MimeType.JSON);
+}
+
+function ok(data)  { return respond({ ok: true,  data: data }); }
+function err(msg)  { return respond({ ok: false, error: msg }); }
+
+// ── ENTRY POINTS ──────────────────────────────────────────────────────────────
+function doGet(e) {
+  try {
+    _callback = e.parameter.callback || '';
+    const action = e.parameter.action || '';
+    const token  = e.parameter.token  || '';
+
+    if (!action) return err('action mancante');
+
+    if (action === 'login') return handleLogin(e.parameter);
+    if (action === 'ping')  return ok({ ts: new Date().toISOString() });
+
+    const user = verifyToken(token);
+    if (!user) return err('Token non valido o scaduto. Ri-effettua il login.');
+
+    switch (action) {
+      case 'getProblemi':   return getProblemi(user);
+      case 'getCommenti':   return getCommenti(e.parameter.probId, user);
+      case 'getReport':     return getReport(user);
+      // Write actions via GET (payload in query string)
+      case 'saveProblema':  {
+        const data = JSON.parse(decodeURIComponent(e.parameter.payload || '{}'));
+        return saveProblema(data, user);
+      }
+      case 'deleteProblema': return deleteProblema(e.parameter.id, user);
+      case 'changeStato':    return changeStato(e.parameter.id, e.parameter.stato, user);
+      case 'addCommento':    return addCommento(e.parameter.probId, e.parameter.testo, user);
+      default:               return err('Azione non riconosciuta: ' + action);
+    }
+  } catch (ex) {
+    return err('Errore server: ' + ex.message);
+  }
+}
+
+function doPost(e) {
+  try {
+    const body   = JSON.parse(e.postData.contents || '{}');
+    const action = body.action || '';
+    const token  = body.token  || '';
+
+    if (!action) return err('action mancante');
+
+    const user = verifyToken(token);
+    if (!user) return err('Token non valido o scaduto.');
+
+    switch (action) {
+      case 'saveProblema':  return saveProblema(body.data, user);
+      case 'deleteProblema':return deleteProblema(body.id, user);
+      case 'addCommento':   return addCommento(body.probId, body.testo, user);
+      case 'changeStato':   return changeStato(body.id, body.stato, user);
+      default:              return err('Azione POST non riconosciuta: ' + action);
+    }
+  } catch (ex) {
+    return err('Errore server POST: ' + ex.message);
+  }
+}
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+function handleLogin(params) {
+  const email    = (params.email || '').toLowerCase().trim();
+  const password = params.password || '';
+
+  const ss    = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(SHEETS.utenti);
+  const rows  = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < rows.length; i++) {
+    const [id, nome, cognome, emailSheet, pwd, ruolo, area, attivo] = rows[i];
+    if (emailSheet.toLowerCase() === email && pwd === password && attivo === 'SI') {
+      const token = Utilities.getUuid();
+      // Salva token nella colonna I con scadenza 12h
+      sheet.getRange(i + 1, 9).setValue(token);
+      sheet.getRange(i + 1, 10).setValue(
+        new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString()
+      );
+      logAction(id, 'LOGIN', 'Accesso effettuato');
+      return ok({
+        token, id, nome, cognome, email: emailSheet,
+        ruolo, area, nomeCompleto: nome + ' ' + cognome
+      });
+    }
+  }
+  return err('Email o password non corretti');
+}
+
+function verifyToken(token) {
+  if (!token) return null;
+  const ss    = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(SHEETS.utenti);
+  const rows  = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < rows.length; i++) {
+    const [id, nome, cognome, email, pwd, ruolo, area, attivo, tok, exp] = rows[i];
+    if (tok === token) {
+      if (new Date(exp) > new Date()) {
+        return { id, nome, cognome, email, ruolo, area,
+                 nomeCompleto: nome + ' ' + cognome };
+      } else {
+        return null; // scaduto
+      }
+    }
+  }
+  return null;
+}
+
+// ── PROBLEMI ──────────────────────────────────────────────────────────────────
+const P_COLS = [
+  'ID','Data','Ora','Titolo','Area','Cliente','Priorita','Stato',
+  'Responsabile','Assegnato','Categoria','Impatto_desc','Impatto_euro',
+  'SLA_ore','Ore_aperto','Azione','Risoluzione','Note',
+  'Risorse_netto','Risorse_totale','Creato_da','Ultima_modifica'
+];
+
+function getProblemi(user) {
+  const ss    = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(SHEETS.problemi);
+  const rows  = sheet.getDataRange().getValues();
+  if (rows.length <= 1) return ok([]);
+
+  const headers = rows[0];
+  const probs   = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row[0]) continue; // riga vuota
+
+    const prob = {};
+    headers.forEach((h, idx) => { prob[h] = row[idx]; });
+
+    // Filtra per area se ruolo non è direttore/ops
+    if (user.ruolo === 'OPERATIVO' && prob.Area !== user.area) continue;
+
+    // Prendi checklist e commenti inline
+    prob.checklist = getChecklist(prob.ID);
+    probs.push(prob);
+  }
+
+  return ok(probs);
+}
+
+function saveProblema(data, user) {
+  const ss    = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(SHEETS.problemi);
+  const rows  = sheet.getDataRange().getValues();
+  const headers = rows[0];
+
+  const now = new Date().toISOString();
+
+  if (data.ID && data.ID !== '') {
+    // UPDATE — trova la riga
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][0] === data.ID) {
+        // Controlla permessi modifica
+        if (user.ruolo === 'OPERATIVO' && rows[i][8] !== user.nomeCompleto && rows[i][9] !== user.nomeCompleto) {
+          return err('Non hai i permessi per modificare questo problema');
+        }
+        const newRow = headers.map(h => h === 'Ultima_modifica' ? now : (data[h] !== undefined ? data[h] : rows[i][headers.indexOf(h)]));
+        sheet.getRange(i + 1, 1, 1, newRow.length).setValues([newRow]);
+        logAction(user.id, 'UPDATE', 'Modificato: ' + data.ID);
+        return ok({ id: data.ID, action: 'updated' });
+      }
+    }
+    return err('Problema non trovato: ' + data.ID);
+  } else {
+    // INSERT — nuovo ID
+    const esistenti = rows.slice(1).map(r => r[0]).filter(Boolean);
+    const maxNum    = esistenti.reduce((m, id) => {
+      const n = parseInt((id + '').replace('PRB-', '')) || 0;
+      return Math.max(m, n);
+    }, 0);
+    const newId     = 'PRB-' + String(maxNum + 1).padStart(3, '0');
+
+    const newRow = headers.map(h => {
+      if (h === 'ID')              return newId;
+      if (h === 'Creato_da')       return user.nomeCompleto;
+      if (h === 'Ultima_modifica') return now;
+      return data[h] !== undefined ? data[h] : '';
+    });
+
+    sheet.appendRow(newRow);
+    logAction(user.id, 'INSERT', 'Creato: ' + newId);
+    return ok({ id: newId, action: 'created' });
+  }
+}
+
+function deleteProblema(id, user) {
+  if (user.ruolo !== 'ADMIN' && user.ruolo !== 'DIRETTORE' && user.ruolo !== 'OPS_MANAGER') {
+    return err('Solo gli admin possono eliminare problemi');
+  }
+  const ss    = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(SHEETS.problemi);
+  const rows  = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][0] === id) {
+      sheet.deleteRow(i + 1);
+      logAction(user.id, 'DELETE', 'Eliminato: ' + id);
+      return ok({ id, action: 'deleted' });
+    }
+  }
+  return err('Problema non trovato');
+}
+
+function changeStato(id, stato, user) {
+  const ss    = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(SHEETS.problemi);
+  const rows  = sheet.getDataRange().getValues();
+  const heads = rows[0];
+  const statoIdx = heads.indexOf('Stato');
+  const modIdx   = heads.indexOf('Ultima_modifica');
+
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][0] === id) {
+      sheet.getRange(i + 1, statoIdx + 1).setValue(stato);
+      if (modIdx >= 0) sheet.getRange(i + 1, modIdx + 1).setValue(new Date().toISOString());
+      logAction(user.id, 'STATO', id + ' → ' + stato);
+      return ok({ id, stato });
+    }
+  }
+  return err('Problema non trovato');
+}
+
+// ── COMMENTI ──────────────────────────────────────────────────────────────────
+function getCommenti(probId, user) {
+  const ss    = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(SHEETS.commenti);
+  const rows  = sheet.getDataRange().getValues();
+  const cmts  = [];
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][0] === probId) {
+      cmts.push({ probId: rows[i][0], autore: rows[i][1], testo: rows[i][2], ts: rows[i][3] });
+    }
+  }
+  return ok(cmts);
+}
+
+function addCommento(probId, testo, user) {
+  const ss    = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(SHEETS.commenti);
+  const now   = new Date().toISOString();
+  sheet.appendRow([probId, user.nomeCompleto, testo, now]);
+  logAction(user.id, 'COMMENTO', probId + ': ' + testo.slice(0, 50));
+  return ok({ probId, autore: user.nomeCompleto, testo, ts: now });
+}
+
+function getChecklist(probId) { return []; } // stored in problema note field for simplicity
+
+// ── REPORT ────────────────────────────────────────────────────────────────────
+function getReport(user) {
+  const ss     = SpreadsheetApp.openById(SHEET_ID);
+  const sheet  = ss.getSheetByName(SHEETS.problemi);
+  const rows   = sheet.getDataRange().getValues();
+  const heads  = rows[0];
+  const probs  = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    if (!rows[i][0]) continue;
+    const p = {};
+    heads.forEach((h, idx) => { p[h] = rows[i][idx]; });
+    probs.push(p);
+  }
+
+  const today    = new Date().toISOString().split('T')[0];
+  const aperti   = probs.filter(p => p.Stato === 'Aperto').length;
+  const inLav    = probs.filter(p => p.Stato === 'In lavorazione' || p.Stato === 'Escalato').length;
+  const risolti  = probs.filter(p => p.Stato === 'Risolto' || p.Stato === 'Chiuso').length;
+  const critici  = probs.filter(p => p.Priorita === 'P0 — Critico' && p.Stato !== 'Risolto').length;
+  const impTot   = probs.filter(p => p.Stato !== 'Risolto' && p.Stato !== 'Chiuso')
+                        .reduce((a, p) => a + Number(p.Impatto_euro || 0), 0);
+
+  return ok({ aperti, inLav, risolti, critici, impTot, totale: probs.length, generato: new Date().toISOString() });
+}
+
+// ── LOG ───────────────────────────────────────────────────────────────────────
+function logAction(userId, azione, dettaglio) {
+  try {
+    const ss    = SpreadsheetApp.openById(SHEET_ID);
+    const sheet = ss.getSheetByName(SHEETS.log);
+    sheet.appendRow([new Date().toISOString(), userId, azione, dettaglio]);
+  } catch(e) { /* ignora errori di log */ }
+}
+
+// ── SETUP (esegui una volta) ───────────────────────────────────────────────────
+function setupSheets() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+
+  function ensureSheet(name, headers) {
+    let sh = ss.getSheetByName(name);
+    if (!sh) sh = ss.insertSheet(name);
+    if (sh.getLastRow() === 0) {
+      sh.appendRow(headers);
+      sh.getRange(1, 1, 1, headers.length)
+        .setBackground('#0D1B2A').setFontColor('#FFFFFF').setFontWeight('bold');
+    }
+    return sh;
+  }
+
+  ensureSheet(SHEETS.problemi, [
+    'ID','Data','Ora','Titolo','Area','Cliente','Priorita','Stato',
+    'Responsabile','Assegnato','Categoria','Impatto_desc','Impatto_euro',
+    'Impatto_costo','Impatto_ricavo',
+    'SLA_ore','Ore_aperto','Azione','Risoluzione','Note',
+    'Risorse_netto','Risorse_totale','Creato_da','Ultima_modifica'
+  ]);
+
+  ensureSheet(SHEETS.commenti, ['ProbID','Autore','Testo','Timestamp']);
+  ensureSheet(SHEETS.risorse,  ['ProbID','Ruolo','N_persone','Ore','CostoOra','TotaleRiga']);
+  ensureSheet(SHEETS.log,      ['Timestamp','UserID','Azione','Dettaglio']);
+
+  // Utenti di default
+  const utentiSh = ensureSheet(SHEETS.utenti, [
+    'ID','Nome','Cognome','Email','Password','Ruolo','Area','Attivo','Token','TokenExp'
+  ]);
+
+  if (utentiSh.getLastRow() <= 1) {
+    const utenti = [
+      ['U01','Yannick','Boutalbi','yannick.boutalbi@smyb.it','smyb2024','ADMIN','Tutte','SI','',''],
+      ['U02','Bruno','Cantiero','bruno.cantiero@smyb.it','smyb2024','DIRETTORE','Tutte','SI','',''],
+      ['U03','Antonio','Salmieri','antonio.salmieri@smyb.it','smyb2024','OPERATIVO','Magazzino','SI','',''],
+      ['U04','Andrea','Marra','andrea.marra@smyb.it','smyb2024','OPERATIVO','Distribuzione','SI','',''],
+      ['U05','Fulvio','Esposito','fulvio.esposito@smyb.it','smyb2024','OPERATIVO','Customer Service','SI','',''],
+      ['U06','Vincenzo','Giordano','vincenzo.giordano@smyb.it','smyb2024','OPERATIVO','IT/EDP','SI','',''],
+      ['U07','Valeria','Gallo','valeria.gallo@smyb.it','smyb2024','OPS_MANAGER','Controllo','SI','',''],
+      ['U08','Elena','Gallo','elena.gallo@smyb.it','smyb2024','DIRETTORE','Tutte','SI','',''],
+      ['U09','Frank Maria','De Feo','frank.defeo@smyb.it','smyb2024','OPERATIVO','Marketing','SI','',''],
+      ['U10','Pietro','Ianicelli','pietro.ianicelli@smyb.it','smyb2024','OPERATIVO','Marketing','SI','',''],
+      ['U11','Angela','Zaramella','angela.zaramella@smyb.it','smyb2024','OPERATIVO','Commerciale','SI','',''],
+    ];
+    utenti.forEach(u => utentiSh.appendRow(u));
+  }
+
+  SpreadsheetApp.flush();
+  return 'Setup completato! Fogli creati: ' + Object.values(SHEETS).join(', ');
+}
 
