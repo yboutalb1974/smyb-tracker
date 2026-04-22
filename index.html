@@ -31,6 +31,7 @@ input,select,textarea{outline:none;color:var(--dk)}
 @keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
 
 /* ── LOGIN ── */
 #login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--nv);padding:20px}
@@ -368,7 +369,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 <script>
 // ══ CONFIG ════════════════════════════════════════════════════════════════════
 // INSERISCI QUI L'URL DEL TUO GOOGLE APPS SCRIPT dopo il deploy
-var API_URL = 'https://script.google.com/macros/s/AKfycbzWYXTAmi7DjeZRATm92bsu1EHYT2yKVKqE5YVapWBsSs8gruqLF0mvyG2cKlrxOwO_/exec';
+var API_URL = localStorage.getItem('smyb_api_url') || 'https://script.google.com/macros/s/AKfycbzWYXTAmi7DjeZRATm92bsu1EHYT2yKVKqE5YVapWBsSs8gruqLF0mvyG2cKlrxOwO_/exec';
 
 // ══ CONSTANTS ═════════════════════════════════════════════════════════════════
 var SC = {
@@ -560,6 +561,9 @@ function loadData() {
     .catch(function(e) {
       setSyncStatus('err', e.message);
       if (e.message && e.message.indexOf('Token') >= 0) {
+        if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
+        localStorage.removeItem('smyb_token');
+        token = '';
         toast('Sessione scaduta. Effettua di nuovo il login.','warn');
         setTimeout(showLogin, 2000);
       }
@@ -600,7 +604,7 @@ function changeStato(id, stato) {
 function sendCommento(probId, testo) {
   return apiPost({ action:'addCommento', probId:probId, testo:testo })
     .then(function(c){ toast('Commento inviato','success'); loadData(); return c; })
-    .catch(function(e){ toast('Errore commento: '+e.message,'err'); });
+    .catch(function(e){ toast('Errore commento: '+e.message,'err'); throw e; });
 }
 
 // ══ RENDER ════════════════════════════════════════════════════════════════════
@@ -732,7 +736,7 @@ function rList() {
             (pct>=100?'<span style="color:#DC2626;font-weight:600">\u26a0 SLA scaduto</span>':pct>=75?'<span style="color:#D97706">\u23f1 SLA '+pct+'%</span>':'')+
           '</div>'+
         '</div>'+
-        '<div class="pr-right">'+bdg(p.Priorita.split(' \u2014 ')[0],pc.bg,pc.fc,pc.c)+bdg(p.Stato,sc.bg,sc.fc,sc.dot)+'<span style="font-size:11px;color:var(--lt);margin-left:4px">'+(isO?'\u25b2':'\u25bc')+'</span></div>'+
+        '<div class="pr-right">'+bdg((p.Priorita||'').split(' \u2014 ')[0],pc.bg,pc.fc,pc.c)+bdg(p.Stato,sc.bg,sc.fc,sc.dot)+'<span style="font-size:11px;color:var(--lt);margin-left:4px">'+(isO?'\u25b2':'\u25bc')+'</span></div>'+
       '</div>'+det+
     '</div>';
   }).join('')+'</div>';
@@ -1023,10 +1027,9 @@ function buildForm(p) {
   addRow(s5,'full',[fg2('Azione correttiva','',inp('faz','text',f.Azione||'','Cosa si farà concretamente'))]);
   var ris=document.createElement('textarea');ris.className='fi';ris.id='fri';ris.rows=2;ris.placeholder='Come è stato risolto?';ris.textContent=f.Risoluzione||'';
   addRow(s5,'full',[fg2('Risoluzione (alla chiusura)','',ris)]);
-  addRow(s5,'tri',[
+  addRow(s5,'',[
     fg2('SLA (ore)','',inp('fsl','number',f.SLA_ore||24,'')),
     fg2('Ore trascorse','',inp('for2','number',f.Ore_aperto||0,'')),
-    fg2('Note aggiuntive','',inp('fno','text',f.Note||'','Note')),
   ]);
 
   // Wire euro events
@@ -1055,7 +1058,6 @@ function updImpTot(){var c=Number((document.getElementById('feu-costo-m')||{}).v
 
 function getFormData(){
   function v(id){var e=document.getElementById(id);return e?e.value.trim():'';}
-  var impEuro=Number(document.getElementById('feu-m')?document.getElementById('feu-m').value:0)||Number(v('feu'))||0;
   var d={
     ID:editId||'',
     Data:v('fd'),Ora:v('fo'),Titolo:v('ft'),Area:v('fa'),Cliente:v('fcl'),
@@ -1065,7 +1067,7 @@ function getFormData(){
     Impatto_desc:v('fid'),
     Impatto_costo:Number(document.getElementById('feu-costo-m')?document.getElementById('feu-costo-m').value:0)||0,
     Impatto_ricavo:Number(document.getElementById('feu-ricavo-m')?document.getElementById('feu-ricavo-m').value:0)||0,
-    Impatto_euro:Number(document.getElementById('feu-costo-m')?document.getElementById('feu-costo-m').value:0)+Number(document.getElementById('feu-ricavo-m')?document.getElementById('feu-ricavo-m').value:0)||0,
+    Impatto_euro:(Number(document.getElementById('feu-costo-m')?document.getElementById('feu-costo-m').value:0)||0)+(Number(document.getElementById('feu-ricavo-m')?document.getElementById('feu-ricavo-m').value:0)||0),
     Azione:v('faz'),Risoluzione:document.getElementById('fri')?document.getElementById('fri').value.trim():'',
     SLA_ore:Number(v('fsl'))||24,Ore_aperto:Number(v('for2'))||0,
   };
@@ -1075,7 +1077,7 @@ function getFormData(){
 function validate(d){
   if(!d.Titolo){toast('Il titolo è obbligatorio','err');return false;}
   if(!d.Area){toast('Seleziona un\'area operativa','err');return false;}
-  if(!d.Note&&!d.Titolo){toast('La descrizione è obbligatoria','err');return false;}
+  if(!d.Note){toast('La descrizione è obbligatoria','err');return false;}
   if(!d.Responsabile){toast('Seleziona il responsabile (A)','err');return false;}
   return true;
 }
