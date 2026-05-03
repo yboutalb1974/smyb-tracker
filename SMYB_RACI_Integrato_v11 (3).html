@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SMYB — RACI Workbook</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --nv:#0D1B2A;--bl:#1B4F72;--ac:#2E86C1;
+  --g:#1D9E75;--gl:#D1FAE5;--gd:#065F46;
+  --a:#D97706;--al:#FEF3C7;--ad:#78350F;
+  --r:#DC2626;--rl:#FEE2E2;--rd:#7F1D1D;
+  --pu:#7C3AED;--pul:#EDE9FE;--pud:#3B0764;
+  --or:#EA580C;--orl:#FFEDD5;
+  --s1:#F8FAFC;--s2:#F1F5F9;--s3:#E2E8F0;--s4:#CBD5E1;
+  --dk:#0F172A;--md:#475569;--lt:#94A3B8;--wh:#FFFFFF;
+  --font:'IBM Plex Sans',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',monospace;
+  --rad:6px;--rad-lg:10px;
+  --sh:0 1px 3px rgba(0,0,0,.06),0 2px 8px rgba(0,0,0,.06);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--s1);color:var(--dk);font-size:13px;min-height:100vh}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--s4);border-radius:2px}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.fade{animation:fadeIn .2s ease}
+
+/* SIDEBAR LAYOUT */
+#app{display:flex;height:100vh;overflow:hidden}
+#sidebar{width:200px;min-width:200px;background:var(--nv);display:flex;flex-direction:column;overflow:hidden;border-right:1px solid rgba(255,255,255,.06);flex-shrink:0}
+#main-content{flex:1;overflow-y:auto;background:var(--s1)}
+
+.nav-brand{padding:16px 14px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:9px;flex-shrink:0}
+.nav-logo{width:28px;height:28px;background:var(--ac);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.nav-logo svg{width:13px;height:13px}
+.nav-title{font-size:13px;font-weight:600;color:#fff;line-height:1.2}
+.nav-sub{font-size:9px;color:rgba(255,255,255,.35);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px}
+
+#tabs{flex:1;overflow-y:auto;padding:6px 0}
+.tab{display:flex;align-items:center;gap:8px;padding:9px 14px;font-size:11px;font-weight:500;color:rgba(255,255,255,.45);cursor:pointer;border-left:3px solid transparent;transition:all .12s;white-space:nowrap}
+.tab:hover{color:rgba(255,255,255,.8);background:rgba(255,255,255,.05)}
+.tab.on{color:#fff;border-left-color:var(--ac);background:rgba(46,134,193,.15)}
+.tab-icon{font-size:13px;flex-shrink:0;width:18px;text-align:center}
+
+/* PAGE */
+#page{max-width:1300px;margin:0 auto;padding:20px}
+
+/* SECTION HEADER */
+.sec-hdr{background:var(--nv);border-radius:var(--rad-lg);padding:18px 22px;margin-bottom:16px;display:flex;align-items:flex-start;justify-content:space-between}
+.sec-title{font-size:18px;font-weight:600;color:#fff;letter-spacing:-.3px}
+.sec-sub{font-size:11px;color:rgba(255,255,255,.4);margin-top:3px;font-family:var(--mono)}
+
+/* CARDS GRID */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:16px}
+.card{background:var(--wh);border-radius:var(--rad-lg);padding:14px 16px;border:1px solid var(--s3);box-shadow:var(--sh)}
+.card-v{font-size:26px;font-weight:600;font-family:var(--mono);line-height:1}
+.card-l{font-size:10px;color:var(--lt);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+
+/* TABLE */
+.tbl-wrap{background:var(--wh);border-radius:var(--rad-lg);border:1px solid var(--s3);overflow:auto;box-shadow:var(--sh);margin-bottom:16px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead tr{background:var(--nv)}
+thead th{padding:9px 11px;text-align:left;font-size:10px;font-weight:600;color:rgba(255,255,255,.7);white-space:nowrap;font-family:var(--mono);text-transform:uppercase;letter-spacing:.4px}
+tbody tr:nth-child(even){background:var(--s2)}
+tbody tr:hover{background:#EBF5FB}
+tbody td{padding:8px 11px;border-top:1px solid var(--s3);vertical-align:middle}
+.area-cell{font-weight:600;color:var(--nv);font-size:11px}
+.proc-cell{color:var(--dk)}
+
+/* RACI PILLS */
+.rp{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;font-size:10px;font-weight:700;font-family:var(--mono)}
+.rp-R{background:#D1FAE5;color:#065F46}
+.rp-A{background:#D6EAF8;color:#1B4F72}
+.rp-C{background:#FEF3C7;color:#78350F}
+.rp-I{background:#EDE9FE;color:#3B0764}
+.rp-empty{background:transparent;color:transparent}
+
+/* BADGE */
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;font-family:var(--mono);white-space:nowrap}
+
+/* WORKLOAD BAR */
+.wl-bar{height:8px;border-radius:4px;background:var(--s3);overflow:hidden;margin-top:4px}
+.wl-fill{height:100%;border-radius:4px;transition:width .3s}
+
+/* ALERT BADGE */
+.alert-dec{background:#FFE0E0;color:#7F1D1D}
+.alert-warn{background:#FFEDD5;color:#7C2D12}
+.alert-ok{background:#D1FAE5;color:#065F46}
+.alert-info{background:#EDE9FE;color:#3B0764}
+.alert-none{background:#F1F5F9;color:#64748B}
+
+/* INDEX */
+.index-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.idx-card{background:var(--wh);border-radius:var(--rad-lg);padding:16px;border:1px solid var(--s3);box-shadow:var(--sh);cursor:pointer;transition:all .15s}
+.idx-card:hover{border-color:var(--ac);box-shadow:0 4px 16px rgba(46,134,193,.15);transform:translateY(-1px)}
+.idx-num{font-size:11px;font-family:var(--mono);color:var(--lt);margin-bottom:4px}
+.idx-icon{font-size:20px;margin-bottom:6px}
+.idx-title{font-size:14px;font-weight:600;color:var(--dk);margin-bottom:4px}
+.idx-desc{font-size:11px;color:var(--lt);line-height:1.5}
+
+/* SC MATRIX area header */
+.area-hdr{background:var(--nv);color:#fff;padding:8px 11px;font-size:11px;font-weight:600;font-family:var(--mono);letter-spacing:.3px}
+
+/* SCHEDA CARD */
+.scheda-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
+.scheda-card{background:var(--wh);border-radius:var(--rad-lg);border:1px solid var(--s3);overflow:hidden;box-shadow:var(--sh)}
+.scheda-hdr{background:var(--bl);padding:12px 14px;display:flex;align-items:center;justify-content:space-between}
+.scheda-name{font-size:13px;font-weight:600;color:#fff}
+.scheda-ruolo{font-size:10px;color:rgba(255,255,255,.55)}
+.scheda-body{padding:12px 14px}
+.scheda-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--s2);font-size:11px}
+.scheda-row:last-child{border:none}
+.scheda-lbl{color:var(--lt);font-weight:500}
+.scheda-val{color:var(--dk);text-align:right;max-width:60%}
+
+/* KPI TABLE */
+.kpi-obj{font-size:10px;color:var(--md);background:var(--s2);padding:2px 6px;border-radius:3px;margin-bottom:2px;display:block}
+.kpi-metric{font-size:11px;font-weight:600;color:var(--gd);font-family:var(--mono)}
+
+/* GUIDA */
+.guida-card{background:var(--wh);border-radius:var(--rad-lg);border:1px solid var(--s3);padding:16px;margin-bottom:10px;box-shadow:var(--sh)}
+.guida-tag{display:inline-block;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;font-family:var(--mono);margin-bottom:8px}
+.guida-title{font-size:15px;font-weight:600;color:var(--dk);margin-bottom:4px}
+.guida-desc{font-size:12px;color:var(--md);line-height:1.6}
+.guida-rule{font-size:11px;color:var(--ac);font-style:italic;margin-top:6px}
+
+/* LEGEND */
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.leg{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500}
+
+/* FILTER BAR */
+.filter-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.fchip{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;background:var(--s2);color:var(--md);border:1px solid var(--s3);transition:all .15s}
+.fchip.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.fchip:hover:not(.on){background:var(--s3)}
+
+@media(max-width:768px){
+  .cards{grid-template-columns:repeat(2,1fr)}
+  .scheda-grid{grid-template-columns:1fr}
+  #page{padding:12px}
+  #sidebar{width:160px;min-width:160px}
+  .tab{padding:8px 10px;font-size:10px}
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="sidebar">
+    <div class="nav-brand">
+      <div class="nav-logo"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5M2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+      <div><div class="nav-title">SMYB · RACI</div><div class="nav-sub">Governance Workbook</div></div>
+    </div>
+    <div id="tabs"></div>
+  </div>
+  <div id="main-content">
+    <div id="page"></div>
+  </div>
+</div>
+
+<script>
+const DATA = {
+  tabs: [
+    { id:'indice',    icon:'📋', label:'Indice' },
+    { id:'analisi',   icon:'📊', label:'Analisi RACI' },
+    { id:'diagram',   icon:'🎯', label:'RACI Diagram' },
+    { id:'workload',  icon:'📈', label:'Workload' },
+    { id:'schede',    icon:'🏷', label:'Schede Ruolo' },
+    { id:'decision',  icon:'⚖', label:'Decision Rights' },
+    { id:'kpi',       icon:'🎯', label:'KPI Dashboard' },
+    { id:'sc_matrix', icon:'🏭', label:'SC · RACI Matrix' },
+    { id:'sc_guida',  icon:'📖', label:'SC · Guida RACI' },
+    { id:'sc_dash',   icon:'📊', label:'SC · Dashboard' },
+  ],
+  raci_roles: ['Op. & Proj. Dir','Ops Manager','WH Supervisor','Distrib. Mgr','Asst Distrib.','Distrib. Desk','Back Office Op.','Partenze & Boll.','Handling Team','Giacenze Spec.','CS Lead','Key Account','Sales Exec.','Pricing & EDP','Ops Controller','Accounting','Treasury & COD','HR Manager','Managing Dir.','IT Support','Fashion Lead','Nike Lead','Client Care Deghi','Mktg IA','Mktg Mgr','Ritiri/SUSA','Op. SUSA'],
+  raci_matrix: [
+    {area:'Inbound', proc:'Controllo orari arrivo bilici', vals:['C','A','R','I','','','','','','','','','','','','','','','','','','','','','','','']},
+    {area:'Inbound', proc:'Registrazione arrivo camion', vals:['C','','A','I','','','','','R','','','','','','','','','','','','','','','','','','']},
+    {area:'Inbound', proc:'Scarico mezzo', vals:['I','C','A','','','','','','R','','','','','','','','','','','','','','','','','','']},
+    {area:'Inbound', proc:'Accettazione barcode e match', vals:['A','','I','','C','','','','R','','','','','','','','','','','','','','','','','','']},
+    {area:'Inbound', proc:'Verbale scarico e quality check', vals:['C','A','R','','','','I','','','','','','','','','','','','','','','','','','','','']},
+    {area:'Inbound', proc:'Trasmissione verbale al committente', vals:['A','','C','','','','R','','','','I','','','','','','','','','','','','','','','','']},
+    {area:'Susa Urgenti', proc:'Prioritizzazione ricambistica', vals:['C','A','','R','','','','','','','','','','','','','','','','','','','','','','','']},
+    {area:'Susa Urgenti', proc:'Borderò ricambistica', vals:['A','','','C','','','','R','','','','','','','','','','','','','','','','','','','']},
+    {area:'Cross-Dock', proc:'Posizionamento per zona consegna', vals:['I','A','','','','','','','R','','','','','','','','','','','','','','','','','','']},
+    {area:'Distribuzione', proc:'Generazione borderò uscita', vals:['I','A','','','','','','R','','','','','','','','','','','','','','','','','','','']},
+    {area:'Distribuzione', proc:'Pianificazione anticipata e carico', vals:['I','A','','R','','','','','','','','','','','','','','','','','','','','','','','']},
+    {area:'Distribuzione', proc:'Consegna finale e POD', vals:['A','','','','','','','','','','R','','','','','','','','','','','','','','','','']},
+    {area:'Vorwerk', proc:'Stoccaggio a scaffale', vals:['C','','','','','','','','R','','','','','','','','','','','','A','','','','','','']},
+    {area:'Vorwerk', proc:'Chiamata cliente e pianificazione', vals:['A','','','','','','','','','','R','','','','','','','','','','','','','','','','']},
+    {area:'Fashion', proc:'Ritiro Emilia Romagna', vals:['A','C','','','','','','','','','','','','','','','','','','','R','','','','','','']},
+    {area:'Fashion', proc:'Scarico manuale e sorting', vals:['I','C','','','','','','','R','','','','','','','','','','','','A','','','','','','']},
+    {area:'Deghi', proc:'SMS clienti in consegna', vals:['I','A','','','','','','','','','C','','','','','','','','','','','','R','','','','']},
+    {area:'Deghi', proc:'Interfaccia sistemi e borderò', vals:['A','C','','','','','','','','','','','','R','','','','','','','','','','','','','']},
+    {area:'Logistica', proc:'Stoccaggio, picking, packing', vals:['C','A','','','','','','','R','','','','','','','','','','','','','','','','','','']},
+    {area:'Produzione SMYB', proc:'Ritiro clienti propri', vals:['A','C','','','','','','','','','','','R','','','','','','','','','','','','','','']},
+    {area:'Produzione SMYB', proc:'Immissione in circuiti committenti', vals:['A','','','','','','','','','','','','','R','','','','','','','','','','','','','']},
+    {area:'Customer Service', proc:'Follow-up e reclami', vals:['A','','','','','','','','','','R','C','','','','','','','','','','','','','','','']},
+    {area:'Governance', proc:'Controllo scavalchi e decisioni', vals:['R','C','','','','','','','','','','','','','','','','','A','','','','','','','','']},
+  ],
+  workload: [
+    {nome:'Bruno Cantiero', ruolo:'Operations Manager', area:'Operations', r:6, a:5, c:4, i:0, tot:15, badge:'⚡ Decisore centrale'},
+    {nome:'Antonio Salmieri', ruolo:'Warehouse Supervisor', area:'Magazzino', r:2, a:5, c:4, i:1, tot:12, badge:'⚡ Decisore centrale'},
+    {nome:'Fulvio Esposito', ruolo:'Customer Service Lead', area:'CS', r:3, a:1, c:1, i:7, tot:12, badge:'✓ Bilanciato'},
+    {nome:'Yannick Boutalbi', ruolo:'Op. & Project Director', area:'Direzione', r:1, a:5, c:3, i:2, tot:11, badge:'⚡ Decisore centrale'},
+    {nome:'Handling Team', ruolo:'Handling Team Log.', area:'Magazzino', r:7, a:0, c:0, i:0, tot:7, badge:'⚠ Esecutore sovraccarico'},
+    {nome:'Andrea Marra', ruolo:'Distribution Manager', area:'Distribuzione', r:2, a:3, c:2, i:0, tot:7, badge:'⚡ Decisore centrale'},
+    {nome:'Vincenzo Giordano', ruolo:'Pricing & EDP Manager', area:'IT/EDP', r:2, a:0, c:2, i:4, tot:8, badge:'✓ Esecutore puro'},
+    {nome:'Sabrina Greco', ruolo:'Back Office Operativo', area:'Back Office', r:1, a:0, c:3, i:4, tot:8, badge:'✓ Esecutore puro'},
+    {nome:'Angela Zaramella', ruolo:'Key Account', area:'Commerciale', r:1, a:0, c:2, i:3, tot:6, badge:'ℹ Informato/Consultato'},
+    {nome:'Giulio Mugavero', ruolo:'Fashion Distribution Lead', area:'Fashion', r:1, a:2, c:0, i:3, tot:6, badge:'✓ Bilanciato'},
+    {nome:'Client Care Deghi', ruolo:'Deghi Client Care', area:'Deghi', r:1, a:0, c:1, i:1, tot:3, badge:'✓ Esecutore puro'},
+    {nome:'Paolo Vivone', ruolo:'Sales Executive', area:'Commerciale', r:1, a:0, c:1, i:2, tot:4, badge:'✓ Esecutore puro'},
+    {nome:'Enzo Ettorre', ruolo:'Partenze & Bollettazione', area:'Partenze', r:2, a:0, c:0, i:2, tot:4, badge:'✓ Esecutore puro'},
+    {nome:'Elena Gallo', ruolo:'Managing Director', area:'Direzione', r:0, a:1, c:1, i:2, tot:4, badge:'✓ Bilanciato'},
+    {nome:'Marco Mogavero', ruolo:'Asst Distrib. Manager', area:'Distribuzione', r:0, a:2, c:0, i:2, tot:4, badge:'ℹ Solo informato'},
+    {nome:'Valeria Gallo', ruolo:'Ops Controller & Credit', area:'Controllo', r:0, a:0, c:1, i:1, tot:2, badge:'ℹ Solo informato'},
+    {nome:'Stefania Gallo', ruolo:'Treasury & COD', area:'Tesoreria', r:0, a:0, c:1, i:1, tot:2, badge:'ℹ Solo informato'},
+  ],
+  schede: [
+    {id:'R01',nome:'Yannick Boutalbi',ruolo:'Op. & Project Director',area:'Direzione Ops',riporta:'Elena Gallo',backup:'Bruno Cantiero',resp:'Controllo scavalchi',acc:'—',kpi:'Budget ≥ 90% | Escalation ≤ 5%',freq:'Monthly'},
+    {id:'R02',nome:'Bruno Cantiero',ruolo:'Operations Manager',area:'Operations',riporta:'Yannick Boutalbi',backup:'Andrea Marra',resp:'—',acc:'Controllo orari bilici; Verbale scarico',kpi:'OTD ≥ 98% | Exception close ≤ 4h',freq:'Daily'},
+    {id:'R03',nome:'Antonio Salmieri',ruolo:'Warehouse Supervisor',area:'Magazzino',riporta:'Bruno Cantiero',backup:'Handling Team',resp:'Controllo orari; Verbale scarico',acc:'—',kpi:'Inbound accuracy ≥ 99.5% | Damage ≤ 0.5%',freq:'Daily'},
+    {id:'R04',nome:'Andrea Marra',ruolo:'Distribution Manager',area:'Distribuzione',riporta:'Bruno Cantiero',backup:'Marco Mogavero',resp:'Prioritizzazione ricambistica',acc:'Pianificazione giri',kpi:'OTD ≥ 97% | Borderò on time ≥ 99%',freq:'Daily'},
+    {id:'R05',nome:'Marco Mogavero',ruolo:'Asst Distribution Manager',area:'Distribuzione',riporta:'Andrea Marra',backup:'Operativo Salerno',resp:'—',acc:'—',kpi:'Backup coverage ≥ 99%',freq:'Weekly'},
+    {id:'R06',nome:'Operativo Salerno',ruolo:'Distribution Operations Desk',area:'Distribuzione',riporta:'Andrea Marra',backup:'Marco Mogavero',resp:'—',acc:'—',kpi:'Desk update completeness ≥ 98%',freq:'Daily'},
+    {id:'R07',nome:'Sabrina Greco',ruolo:'Back Office Operativo',area:'Back Office',riporta:'Bruno Cantiero',backup:'Operativo Salerno',resp:'Trasmissione verbale committente',acc:'—',kpi:'Verbale completeness ≥ 99%',freq:'Daily'},
+    {id:'R08',nome:'Enzo Ettorre',ruolo:'Partenze & Bollettazione',area:'Partenze',riporta:'Bruno Cantiero',backup:'Operativo Salerno',resp:'Borderò ricambistica; Generazione borderò',acc:'—',kpi:'Departure OTD ≥ 99% | Error ≤ 0.3%',freq:'Daily'},
+    {id:'R09',nome:'Handling Team Log.',ruolo:'Handling Team Logistica',area:'Magazzino',riporta:'Antonio Salmieri',backup:'WH Supervisor',resp:'Registrazione arrivo; Scarico; Accettazione',acc:'—',kpi:'Scan accuracy ≥ 99.8% | Zero infortuni',freq:'Daily'},
+    {id:'R10',nome:'Rosaria De Mattia',ruolo:'Giacenze Specialist',area:'Giacenze',riporta:'Bruno Cantiero',backup:'Fulvio Esposito',resp:'—',acc:'—',kpi:'Backlog ≤ 5 days ≥ 95% | Recurrence ≤ 2%',freq:'Weekly'},
+    {id:'R11',nome:'Fulvio Esposito',ruolo:'Customer Service Lead',area:'CS',riporta:'Yannick Boutalbi',backup:'Rosaria De Mattia',resp:'Consegna POD; Chiamata cliente',acc:'—',kpi:'CSAT ≥ 4.2/5 | FCR ≥ 85%',freq:'Daily'},
+    {id:'R12',nome:'Angela Zaramella',ruolo:'Key Account',area:'Commerciale',riporta:'Yannick Boutalbi',backup:'Fulvio Esposito',resp:'—',acc:'—',kpi:'Issue closure SLA ≥ 98%',freq:'Monthly'},
+    {id:'R13',nome:'Paolo Vivone',ruolo:'Sales Executive',area:'Commerciale',riporta:'Yannick Boutalbi',backup:'Angela Zaramella',resp:'Ritiro clienti propri',acc:'—',kpi:'Quote win rate | ≥ 2 new accounts/Q',freq:'Monthly'},
+    {id:'R14',nome:'Vincenzo Giordano',ruolo:'Pricing & EDP Manager',area:'IT/EDP',riporta:'Yannick Boutalbi',backup:'IT Support',resp:'Interfaccia sistemi; Immissione circuiti',acc:'—',kpi:'Rate accuracy ≥ 99.9% | Uptime ≥ 99.5%',freq:'Monthly'},
+    {id:'R15',nome:'Valeria Gallo',ruolo:'Ops Controller & Credit',area:'Controllo',riporta:'Yannick Boutalbi',backup:'Mirko Benevento',resp:'—',acc:'—',kpi:'Collection efficiency | Credit adherence',freq:'Monthly'},
+    {id:'R16',nome:'Mirko Benevento',ruolo:'Accounting',area:'Amministrazione',riporta:'Elena Gallo',backup:'Valeria Gallo',resp:'—',acc:'—',kpi:'Month-end close ≥ 99.8% | ≤ WD+5',freq:'Monthly'},
+    {id:'R17',nome:'Stefania Gallo',ruolo:'Treasury & COD',area:'Tesoreria',riporta:'Elena Gallo',backup:'Mirko Benevento',resp:'—',acc:'—',kpi:'Cash variance ≥ 99% | Forecast ±5%',freq:'Weekly'},
+    {id:'R18',nome:'Umberto Buchicchio',ruolo:'HR Manager',area:'HR',riporta:'Elena Gallo',backup:'—',resp:'—',acc:'—',kpi:'Training ≤ 45 days | Turnover rate 100%',freq:'Monthly'},
+    {id:'R19',nome:'Elena Gallo',ruolo:'Managing Director',area:'Direzione',riporta:'—',backup:'Yannick Boutalbi',resp:'—',acc:'Controllo scavalchi',kpi:'Budget attainment ≥ 90%',freq:'Monthly'},
+    {id:'R20',nome:'Supporto Tecnico IT',ruolo:'IT Support',area:'IT/EDP',riporta:'Vincenzo Giordano',backup:'—',resp:'—',acc:'—',kpi:'MTTR ≥ 99.5% | Ticket SLA ≤ 4h',freq:'Daily'},
+    {id:'R21',nome:'Giulio Mugavero',ruolo:'Fashion Distribution Lead',area:'Fashion',riporta:'Bruno Cantiero',backup:'Simone Villacaro',resp:'Ritiro Emilia Romagna',acc:'Stoccaggio; Scarico sorting',kpi:'Appointment success ≥ 98%',freq:'Weekly'},
+    {id:'R22',nome:'Simone Villacaro',ruolo:'Nike Distribution Lead',area:'Nike/Deghi',riporta:'Bruno Cantiero',backup:'Giulio Mugavero',resp:'—',acc:'—',kpi:'Exception resolution ≤ 24h ≥ 98%',freq:'Weekly'},
+    {id:'R23',nome:'Client Care Deghi',ruolo:'Deghi Client Care',area:'Deghi',riporta:'Fulvio Esposito',backup:'Simone Villacaro',resp:'SMS clienti in consegna',acc:'—',kpi:'Appointment success 100%',freq:'Daily'},
+    {id:'R24',nome:'Frank Maria De Feo',ruolo:'Marketing & IA Advisor',area:'Marketing',riporta:'Yannick Boutalbi',backup:'Pietro Ianicelli',resp:'—',acc:'—',kpi:'≥ 2 Campaign initiatives | vs plan',freq:'Monthly'},
+    {id:'R25',nome:'Pietro Ianicelli',ruolo:'Marketing Manager',area:'Marketing',riporta:'Yannick Boutalbi',backup:'Frank Maria De Feo',resp:'—',acc:'—',kpi:'Visitor-to-lead conversion | vs funnel',freq:'Monthly'},
+    {id:'R26',nome:'Simone Procida',ruolo:'Ritiri & Backup SUSA',area:'Ritiri/SUSA',riporta:'Andrea Marra',backup:'Vincenzo Fruncillo',resp:'—',acc:'—',kpi:'Pickup SLA ≥ 98% | Backup ≤ 1%',freq:'Weekly'},
+    {id:'R27',nome:'Vincenzo Fruncillo',ruolo:'Operatore SUSA',area:'SUSA Ops',riporta:'Andrea Marra',backup:'Simone Procida',resp:'—',acc:'—',kpi:'POD return ≤ 24h ≥ 99%',freq:'Daily'},
+  ],
+  decision_rights: [
+    {area:'Cambio priorità giornaliera servizio', propone:'Distribution Manager', decide:'Operations & Project Director', consulta:'Ops Manager, Key Account', esc:'L2', nota:'Solo per deroghe ai giri già chiusi'},
+    {area:'Accettazione merce con danno/mancanza', propone:'Warehouse Supervisor', decide:'Operations Manager', consulta:'Back Office, CS Lead', esc:'L1', nota:'Stop immediato + verbale fotografico'},
+    {area:'Deroga a cut-off/route già chiusa', propone:'Asst Distribution Manager', decide:'Distribution Manager', consulta:'Operations & Project Director', esc:'L2', nota:'Max 1 deroga/giorno senza escalation'},
+    {area:'Uso sub-vettore esterno', propone:'Distribution Manager', decide:'Operations & Project Director', consulta:'Operations Manager', esc:'L2', nota:'Solo per emergenze documentate'},
+    {area:'Rimborso/accessorio/extra-costo', propone:'Ops Controller & Credit', decide:'Operations & Project Director', consulta:'Accounting, Treasury', esc:'L2', nota:'Secondo contratto'},
+    {area:'Promessa cliente fuori standard', propone:'Key Account', decide:'Operations & Project Director', consulta:'Distribution Manager, WH Supervisor', esc:'L2', nota:'Previa verifica fattibilità ops'},
+    {area:'Blocco merce per qualità/sicurezza', propone:'Warehouse Supervisor', decide:'Operations Manager', consulta:'Operations & Project Director', esc:'L2', nota:'Stop immediato — nessuna eccezione'},
+    {area:'Scelta network partner produzione', propone:'Pricing & EDP Manager', decide:'Operations & Project Director', consulta:'Sales Executive', esc:'L2', nota:'Valutazione costo/servizio documentata'},
+    {area:'Investimento IT/process improvement', propone:'Pricing & EDP Manager', decide:'Managing Director', consulta:'Operations & Project Director', esc:'L3', nota:'Business case scritto obbligatorio'},
+  ],
+  kpi_data: [
+    {nome:'Yannick Boutalbi',ruolo:'Op. & Proj. Director',obj1:'Standardizzare governance interfunzionale',obj2:'Ridurre escalation tardive',obj3:'Guidare progetti strategici',kpi1:'Budget attainment ≥ 90%',kpi2:'Escalation rate reduction',kpi3:'Strategic initiative delivery'},
+    {nome:'Bruno Cantiero',ruolo:'Operations Manager',obj1:'Stabilizzare execution giornaliera',obj2:'Rendere prevedibili priorità e handoff',obj3:'Chiudere eccezioni entro giornata',kpi1:'OTD ≥ 98%',kpi2:'Exception close ≤ 4h',kpi3:'Zero scavalchi non autorizzati'},
+    {nome:'Antonio Salmieri',ruolo:'Warehouse Supervisor',obj1:'Garantire inbound disciplinato e tracciato',obj2:'Ridurre danni, mismatch e tempi scarico',obj3:'Assicurare verbali completi',kpi1:'Inbound accuracy ≥ 99.5%',kpi2:'Damage rate ≤ 0.5%',kpi3:'Verbale completeness 100%'},
+    {nome:'Andrea Marra',ruolo:'Distribution Manager',obj1:'Piano giri robusto il giorno prima',obj2:'Massimizzare saturazione mezzi',obj3:'Gestire priorità e deroghe',kpi1:'OTD ≥ 97%',kpi2:'Vehicle utilization ≥ 85%',kpi3:'Borderò on time ≥ 99%'},
+    {nome:'Fulvio Esposito',ruolo:'Customer Service Lead',obj1:'Alzare qualità comunicazioni clienti',obj2:'Ridurre tempi di risposta',obj3:'Standard follow-up reclami',kpi1:'CSAT ≥ 4.2/5',kpi2:'First contact resolution ≥ 85%',kpi3:'Complaint close ≤ 48h'},
+    {nome:'Angela Zaramella',ruolo:'Key Account',obj1:'Proteggere retention clienti top',obj2:'Anticipare criticità con dati',obj3:'Sviluppare share of wallet',kpi1:'Issue closure SLA ≥ 98%',kpi2:'Top-account retention ≥ 95%',kpi3:'Upsell/cross-sell growth'},
+    {nome:'Vincenzo Giordano',ruolo:'Pricing & EDP Manager',obj1:'Tariffe e anagrafiche corrette',obj2:'Interfacce FTP/API stabili',obj3:'Ridurre tempi di setup',kpi1:'Rate accuracy ≥ 99.9%',kpi2:'System uptime ≥ 99.5%',kpi3:'Setup lead time ≤ 3 days'},
+    {nome:'Elena Gallo',ruolo:'Managing Director',obj1:'Definire priorità strategiche e budget',obj2:'Allineare crescita e marginalità',obj3:'Sbloccare decisioni critiche',kpi1:'Budget attainment',kpi2:'Strategic plan execution',kpi3:'Decision turnaround ≤ 24h'},
+    {nome:'Handling Team Log.',ruolo:'Handling Team',obj1:'Scarico e movimentazione in sicurezza',obj2:'Massimizzare produttività',obj3:'Garantire scansione completa',kpi1:'Scan accuracy ≥ 99.8%',kpi2:'Units/hour productivity',kpi3:'Zero infortuni/mese'},
+    {nome:'Rosaria De Mattia',ruolo:'Giacenze Specialist',obj1:'Ridurre backlog giacenze',obj2:'Migliorare follow-up mancata consegna',obj3:'Chiudere casi senza ricorrenze',kpi1:'Backlog ≤ 5 days ≥ 95%',kpi2:'Recurrence ≤ 2%',kpi3:'Case closure ≤ 48h'},
+  ],
+  sc_roles: ['CEO/Dir.Gen.','Dir.Operativo','Resp.SC','Resp.Acquisti','Resp.Magazzino','Resp.Logistica','Resp.Produzione','Resp.Qualità','Resp.IT','CFO','Resp.Customer','Legal','HR','PMO'],
+  sc_matrix: [
+    {area:'🗂 Pianificazione', procs:[
+      {name:'Pianificazione strategica SC', vals:['A','R','','C','C','C','C','','C','','','','','']},
+      {name:'Sales & Operations Planning (S&OP)', vals:['C','A','R','C','C','C','C','','C','','','','','R']},
+      {name:'Previsione della domanda', vals:['','C','R','C','','','','','','','','','','A']},
+      {name:'Piano di produzione mensile', vals:['','C','','C','','A','C','','','R','','','','']},
+    ]},
+    {area:'🛒 Acquisti', procs:[
+      {name:'Selezione e qualifica fornitori', vals:['C','C','C','A','C','R','C','','C','','','','','']},
+      {name:'Negoziazione contratti fornitura', vals:['C','C','C','A','C','','C','','R','','','','','']},
+      {name:'Emissione ordini di acquisto', vals:['','C','R','','','','','C','A','','I','','','']},
+      {name:'Gestione scorte di sicurezza', vals:['','C','A','R','','','R','','','','C','','','']},
+      {name:'Valutazione performance fornitori', vals:['','C','C','A','R','','','C','','','','','','']},
+    ]},
+    {area:'📦 Magazzino', procs:[
+      {name:'Ricezione e accettazione merci', vals:['C','','C','A','','C','R','','','R','','','','']},
+      {name:'Stoccaggio e organizzazione WH', vals:['','C','A','','','','','','','','','','','']},
+      {name:'Gestione inventario (WMS)', vals:['','C','A','','','C','','','','C','R','','','']},
+      {name:'Inventario fisico periodico', vals:['','C','C','A','','','R','','','C','','','','']},
+      {name:'Gestione resi e scarti', vals:['','C','C','A','','C','','','R','','C','','','']},
+    ]},
+    {area:'🚚 Logistica', procs:[
+      {name:'Gestione trasporti in entrata', vals:['','C','R','','C','A','R','','','','','','','C']},
+      {name:'Gestione trasporti in uscita', vals:['','C','A','','','','R','','','','R','','','']},
+      {name:'Selezione partner logistici (3PL)', vals:['','C','C','C','A','C','C','','R','','','','','']},
+      {name:'Monitoraggio spedizioni', vals:['','C','A','','','','R','','C','','I','','','R']},
+      {name:'Gestione dogana e compliance', vals:['','C','C','A','','C','','','','','R','','','C']},
+    ]},
+    {area:'🏭 Produzione', procs:[
+      {name:'Schedulazione produzione', vals:['','C','C','A','','','','C','','','C','','','']},
+      {name:'Controllo avanzamento produzione', vals:['','C','C','A','','','','','','C','','','','']},
+      {name:'Gestione non conformità', vals:['','C','C','A','','','','','','R','','','','']},
+      {name:'Manutenzione impianti', vals:['','C','A','','','','','','','C','','','','']},
+    ]},
+    {area:'✅ Qualità', procs:[
+      {name:'Controllo qualità inbound', vals:['','C','C','R','A','','','','','C','','','','']},
+      {name:'Audit qualità fornitori', vals:['','C','R','','A','','','','','C','','','','']},
+      {name:'Certificazioni e compliance', vals:['','C','C','A','','','','','R','','','','','']},
+      {name:'Customer complaints management', vals:['','C','C','A','','','','','','R','','','','']},
+    ]},
+    {area:'💻 IT & Tech', procs:[
+      {name:'Gestione ERP / WMS', vals:['','C','C','','','C','A','','','','','','','']},
+      {name:'Integrazione EDI con fornitori', vals:['','C','C','A','','','','','R','','','','','']},
+      {name:'Business Intelligence & KPI', vals:['','C','R','C','','C','C','','C','A','','C','','C']},
+      {name:'Cybersecurity supply chain', vals:['','C','A','','','','','','','C','','','','']},
+    ]},
+    {area:'💰 Finance', procs:[
+      {name:'Budget acquisti annuale', vals:['A','C','','C','R','','','C','','R','','','','']},
+      {name:'Gestione pagamenti fornitori', vals:['I','C','A','','','','','R','','','','','','']},
+      {name:'Analisi costi logistici', vals:['','C','C','R','','A','','','','C','','','','']},
+      {name:'Reporting KPI supply chain', vals:['','C','R','R','','C','C','','C','C','','C','C','']},
+    ]},
+  ],
+  sc_dashboard: [
+    {area:'🗂 Pianificazione', procs:4, r:4, a:4},
+    {area:'🛒 Acquisti', procs:5, r:5, a:5},
+    {area:'📦 Magazzino', procs:5, r:5, a:5},
+    {area:'🚚 Logistica', procs:5, r:5, a:5},
+    {area:'🏭 Produzione', procs:4, r:4, a:4},
+    {area:'✅ Qualità', procs:4, r:4, a:4},
+    {area:'💻 IT & Tech', procs:4, r:4, a:4},
+    {area:'💰 Finance', procs:4, r:4, a:4},
+  ],
+};
+
+var activeTab = 'indice';
+var areaFilter = 'tutti';
+
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+function rp(v) {
+  if(!v) return '<span class="rp rp-empty">·</span>';
+  return `<span class="rp rp-${v}">${v}</span>`;
+}
+function badge(txt, cls) {
+  return `<span class="badge ${cls}">${txt}</span>`;
+}
+function ini(name) {
+  return name.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
+}
+var avColors = ['#2E86C1','#1D9E75','#D97706','#7C3AED','#EA580C','#DC2626'];
+function avColor(name) {
+  var h=0; for(var i=0;i<name.length;i++) h=(h<<5)-h+name.charCodeAt(i)|0;
+  return avColors[Math.abs(h)%avColors.length];
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function buildTabs() {
+  var el = document.getElementById('tabs');
+  el.innerHTML = DATA.tabs.map(t =>
+    `<div class="tab ${t.id===activeTab?'on':''}" onclick="switchTab('${t.id}')">
+      <span class="tab-icon">${t.icon}</span>${t.label}
+    </div>`
+  ).join('');
+}
+
+function switchTab(id) {
+  activeTab = id;
+  areaFilter = 'tutti';
+  buildTabs();
+  renderPage();
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function renderPage() {
+  var el = document.getElementById('page');
+  el.className = 'fade';
+  var html = '';
+  switch(activeTab) {
+    case 'indice':   html = renderIndice();   break;
+    case 'analisi':  html = renderAnalisi();  break;
+    case 'diagram':  html = renderDiagram();  break;
+    case 'workload': html = renderWorkload(); break;
+    case 'schede':   html = renderSchede();   break;
+    case 'decision': html = renderDecision(); break;
+    case 'kpi':      html = renderKPI();      break;
+    case 'sc_matrix':html = renderSCMatrix(); break;
+    case 'sc_guida': html = renderSCGuida();  break;
+    case 'sc_dash':  html = renderSCDash();   break;
+  }
+  el.innerHTML = html;
+  // re-trigger animation
+  void el.offsetWidth;
+  el.className = 'fade';
+}
+
+// ── INDICE ────────────────────────────────────────────────────────────────────
+function renderIndice() {
+  return `
+  <div class="sec-hdr">
+    <div>
+      <div class="sec-title">SMYB — Governance & RACI Workbook</div>
+      <div class="sec-sub">27 ruoli · 23 processi · 6 moduli · Supply Chain integrata</div>
+    </div>
+  </div>
+  <div class="cards">
+    <div class="card"><div class="card-v" style="color:var(--ac)">27</div><div class="card-l">Ruoli mappati</div></div>
+    <div class="card"><div class="card-v" style="color:var(--g)">23</div><div class="card-l">Processi core</div></div>
+    <div class="card"><div class="card-v" style="color:var(--a)">35</div><div class="card-l">Processi SC</div></div>
+    <div class="card"><div class="card-v" style="color:var(--pu)">9</div><div class="card-l">Decision rights</div></div>
+    <div class="card"><div class="card-v" style="color:var(--or)">10</div><div class="card-l">Fogli workbook</div></div>
+  </div>
+  <div class="index-grid">
+    ${DATA.tabs.slice(1).map((t,i) => `
+    <div class="idx-card" onclick="switchTab('${t.id}')">
+      <div class="idx-num">${String(i+1).padStart(2,'0')}</div>
+      <div class="idx-icon">${t.icon}</div>
+      <div class="idx-title">${t.label}</div>
+      <div class="idx-desc">${getTabDesc(t.id)}</div>
+    </div>`).join('')}
+  </div>`;
+}
+
+function getTabDesc(id) {
+  var descs = {
+    analisi:  'Sovraccarichi, gap e conflitti R/A per ogni ruolo e processo',
+    diagram:  'Matrice colorata attività × ruoli con filtro per area',
+    workload: 'Conteggio R/A/C/I per persona con heatmap e ranking',
+    schede:   'Scheda per ogni persona: processi, KPI e backup',
+    decision: 'Matrice chi-propone/chi-decide/chi-consulta/chi-informa',
+    kpi:      'KPI quantitativi e obiettivi qualitativi per funzione',
+    sc_matrix:'Matrice RACI completa Operazioni & Supply Chain — 35 processi',
+    sc_guida: 'Guida utilizzo modello RACI con regole e best practice',
+    sc_dash:  'Dashboard copertura RACI per area Supply Chain',
+  };
+  return descs[id] || '';
+}
+
+// ── ANALISI ───────────────────────────────────────────────────────────────────
+function renderAnalisi() {
+  var alertMap = {
+    'Bruno Cantiero':   {cls:'alert-dec', txt:'⚡ A multipli (5) + Carico alto'},
+    'Antonio Salmieri': {cls:'alert-dec', txt:'⚡ A multipli (5) + Carico alto'},
+    'Fulvio Esposito':  {cls:'alert-ok',  txt:'✓ Ruolo bilanciato'},
+    'Yannick Boutalbi': {cls:'alert-dec', txt:'⚡ A multipli (5) + Carico alto'},
+    'Handling Team Log.':{cls:'alert-warn',txt:'⚠ R sovraccarico (7)'},
+    'Andrea Marra':     {cls:'alert-dec', txt:'⚡ A multipli (3)'},
+  };
+
+  var rows = DATA.workload.map((w,i) => {
+    var al = alertMap[w.nome] || {cls:'alert-ok', txt:'✓ OK'};
+    return `<tr>
+      <td><b>${w.ruolo}</b></td>
+      <td>${w.nome}</td>
+      <td style="color:var(--lt);font-size:11px">${w.area}</td>
+      <td style="text-align:center;font-weight:700;color:var(--gd)">${w.r||'—'}</td>
+      <td style="text-align:center;font-weight:700;color:var(--ac)">${w.a||'—'}</td>
+      <td style="text-align:center;font-weight:700;color:var(--ad)">${w.c||'—'}</td>
+      <td style="text-align:center;font-weight:700;color:var(--pud)">${w.i||'—'}</td>
+      <td style="text-align:center;font-weight:700">${w.tot||'—'}</td>
+      <td>${badge(al.txt, al.cls)}</td>
+    </tr>`;
+  }).join('');
+
+  return `
+  <div class="sec-hdr">
+    <div><div class="sec-title">Analisi RACI — Sovraccarichi, Gap e Conflitti</div>
+    <div class="sec-sub">Analisi automatica delle assegnazioni R/A/C/I</div></div>
+  </div>
+  <div class="cards">
+    <div class="card"><div class="card-v" style="color:var(--r)">3</div><div class="card-l">Decisori sovraccarichi</div></div>
+    <div class="card"><div class="card-v" style="color:var(--or)">1</div><div class="card-l">Esecutori sovraccarichi</div></div>
+    <div class="card"><div class="card-v" style="color:var(--g)">23</div><div class="card-l">Processi senza criticità</div></div>
+    <div class="card"><div class="card-v" style="color:var(--ac)">7</div><div class="card-l">Ruoli con almeno 1 A</div></div>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th>Ruolo</th><th>Persona</th><th>Area</th>
+        <th style="text-align:center;color:#6EE7B7">R</th>
+        <th style="text-align:center;color:#93C5FD">A</th>
+        <th style="text-align:center;color:#FCD34D">C</th>
+        <th style="text-align:center;color:#C4B5FD">I</th>
+        <th style="text-align:center">Tot.</th>
+        <th>Alert</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+// ── RACI DIAGRAM ─────────────────────────────────────────────────────────────
+function renderDiagram() {
+  var areas = [...new Set(DATA.raci_matrix.map(r=>r.area))];
+
+  var filterBar = `<div class="filter-bar">
+    <div class="fchip ${areaFilter==='tutti'?'on':''}" onclick="setArea('tutti',this)">Tutte le aree</div>
+    ${areas.map(a => `<div class="fchip ${areaFilter===a?'on':''}" onclick="setArea('${a}',this)">${a}</div>`).join('')}
+  </div>`;
+
+  var filtered = areaFilter==='tutti' ? DATA.raci_matrix : DATA.raci_matrix.filter(r=>r.area===areaFilter);
+
+  var roleHeaders = DATA.raci_roles.map(r =>
+    `<th style="writing-mode:vertical-rl;transform:rotate(180deg);padding:8px 4px;font-size:9px;max-height:100px;min-width:28px;white-space:nowrap">${r}</th>`
+  ).join('');
+
+  var rows = filtered.map(r => {
+    var cells = r.vals.map(v => `<td style="text-align:center;padding:4px">${rp(v)}</td>`).join('');
+    return `<tr>
+      <td class="area-cell" style="font-size:10px;white-space:nowrap;padding:6px 10px">${r.area}</td>
+      <td class="proc-cell" style="white-space:nowrap;padding:6px 10px;min-width:200px">${r.proc}</td>
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  return `
+  <div class="sec-hdr">
+    <div><div class="sec-title">RACI Diagram — Matrice Attività × Ruoli</div>
+    <div class="sec-sub">23 processi × 27 ruoli — filtra per area operativa</div></div>
+  </div>
+  <div class="legend">
+    <div class="leg"><span class="rp rp-R">R</span> Responsible — chi esegue</div>
+    <div class="leg"><span class="rp rp-A">A</span> Accountable — chi decide</div>
+    <div class="leg"><span class="rp rp-C">C</span> Consulted — chi consulta</div>
+    <div class="leg"><span class="rp rp-I">I</span> Informed — chi è informato</div>
+  </div>
+  ${filterBar}
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Area</th><th>Processo</th>${roleHeaders}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+function setArea(a, el) {
+  areaFilter = a;
+  document.querySelectorAll('.fchip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+  // Re-render just the table part
+  renderPage();
+}
+
+// ── WORKLOAD ──────────────────────────────────────────────────────────────────
+function renderWorkload() {
+  var maxTot = Math.max(...DATA.workload.map(w=>w.tot||0));
+  var rows = DATA.workload.map(w => {
+    var pct = maxTot > 0 ? Math.round((w.tot||0)/maxTot*100) : 0;
+    var badgeCls = w.badge.includes('⚡') ? 'alert-dec' : w.badge.includes('⚠') ? 'alert-warn' : w.badge.includes('ℹ') ? 'alert-info' : 'alert-ok';
+    return `<tr>
+      <td style="font-weight:600">${w.ruolo}</td>
+      <td>${w.nome}</td>
+      <td style="font-size:11px;color:var(--lt)">${w.area}</td>
+      <td style="text-align:center"><span style="color:var(--gd);font-weight:700">${w.r||0}</span></td>
+      <td style="text-align:center"><span style="color:var(--ac);font-weight:700">${w.a||0}</span></td>
+      <td style="text-align:center"><span style="color:var(--ad);font-weight:700">${w.c||0}</span></td>
+      <td style="text-align:center"><span style="color:var(--pud);font-weight:700">${w.i||0}</span></td>
+      <td style="min-width:120px">
+        <div style="font-size:11px;font-weight:700;font-family:var(--mono)">${w.tot||0}</div>
+        <div class="wl-bar"><div class="wl-fill" style="width:${pct}%;background:${pct>70?'var(--r)':pct>40?'var(--a)':'var(--g)'}"></div></div>
+      </td>
+      <td>${badge(w.badge, badgeCls)}</td>
+    </tr>`;
+  }).join('');
+
+  return `
+  <div class="sec-hdr">
+    <div><div class="sec-title">Workload Dashboard — Distribuzione R/A/C/I</div>
+    <div class="sec-sub">Chi fa troppo · Chi decide tutto · Chi è solo in copia</div></div>
+  </div>
+  <div class="cards">
+    <div class="card"><div class="card-v">23</div><div class="card-l">Processi totali</div></div>
+    <div class="card"><div class="card-v" style="color:var(--ac)">27</div><div class="card-l">Ruoli attivi</div></div>
+    <div class="card"><div class="card-v" style="color:var(--g)">23</div><div class="card-l">Assegnazioni R</div></div>
+    <div class="card"><div class="card-v" style="color:var(--ac)">23</div><div class="card-l">Assegnazioni A</div></div>
+    <div class="card"><div class="card-v" style="color:var(--pu)">25/27</div><div class="card-l">Ruoli con backup</div></div>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th>Ruolo</th><th>Persona</th><th>Area</th>
+        <th style="text-align:center;color:#6EE7B7">R</th>
+        <th style="text-align:center;color:#93C5FD">A</th>
+        <th style="text-align:center;color:#FCD34D">C</th>
+        <th style="text-align:center;color:#C4B5FD">I</th>
+        <th>Totale</th><th>Profilo</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+// ── SCHEDE RUOLO ──────────────────────────────────────────────────────────────
+function renderSchede() {
+  var cards = DATA.schede.map(s => {
+    var col = avColor(s.nome);
+    return `
+    <div class="scheda-card">
+      <div class="scheda-hdr" style="background:${col}">
+        <div>
+          <div class="scheda-name">${s.nome}</div>
+          <div class="scheda-ruolo">${s.ruolo}</div>
+        </div>
+        <span style="background:rgba(255,255,255,.2);color:#fff;padding:2px 8px;border-radius:4px;font-size:10px;font-family:var(--mono)">${s.id}</span>
+      </div>
+      <div class="scheda-body">
+        <div class="scheda-row"><span class="scheda-lbl">Area</span><span class="scheda-val">${s.area}</span></div>
+        <div class="scheda-row"><span class="scheda-lbl">Riporta a</span><span class="scheda-val">${s.riporta}</span></div>
+        <div class="scheda-row"><span class="scheda-lbl">Backup</span><span class="scheda-val">${s.backup}</span></div>
+        <div class="scheda-row"><span class="scheda-lbl">Responsible (R)</span><span class="scheda-val" style="font-size:10px">${s.resp}</span></div>
+        <div class="scheda-row"><span class="scheda-lbl">Accountable (A)</span><span class="scheda-val" style="font-size:10px">${s.acc}</span></div>
+        <div class="scheda-row"><span class="scheda-lbl">KPI chiave</span><span class="scheda-val" style="font-size:10px;color:var(--gd)">${s.kpi}</span></div>
+        <div class="scheda-row"><span class="scheda-lbl">Review freq.</span><span class="scheda-val">${s.freq}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+  return `
+  <div class="sec-hdr">
+    <div><div class="sec-title">Schede Ruolo — Processi, KPI e Backup</div>
+    <div class="sec-sub">Una scheda per ogni persona · KPI quantitativi · Backup assegnato</div></div>
+  </div>
+  <div class="scheda-grid">${cards}</div>`;
+}
+
+// ── DECISION RIGHTS ───────────────────────────────────────────────────────────
+function renderDecision() {
+  var escColors = {'L1':'alert-ok','L2':'alert-info','L3':'alert-warn'};
+  var rows = DATA.decision_rights.map(d => `
+    <tr>
+      <td style="font-weight:600;color:var(--nv)">${d.area}</td>
+      <td>${badge(d.propone,'alert-info')}</td>
+      <td>${badge(d.decide,'alert-dec')}</td>
+      <td style="font-size:11px;color:var(--md)">${d.consulta}</td>
+      <td style="text-align:center">${badge(d.esc, escColors[d.esc]||'alert-ok')}</td>
+      <td style="font-size:11px;color:var(--lt);font-style:italic">${d.nota}</td>
+    </tr>`).join('');
+
+  return `
+  <div class="sec-hdr">
+    <div><div class="sec-title">Decision Rights & Anti-Scavalco</div>
+    <div class="sec-sub">Chi propone · Chi decide · Chi consulta · Chi informa — 9 aree decisionali</div></div>
+  </div>
+  <div class="cards">
+    <div class="card"><div class="card-v" style="color:var(--ac)">9</div><div class="card-l">Aree decisionali</div></div>
+    <div class="card"><div class="card-v" style="color:var(--g)">3</div><div class="card-l">Livelli escalation</div></div>
+    <div class="card" style="background:#FEE2E2"><div class="card-v" style="color:var(--r)">0</div><div class="card-l">Decisioni ambigue</div></div>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th>Area decisionale</th>
+        <th>Chi propone</th>
+        <th>Chi decide</th>
+        <th>Chi consulta</th>
+        <th style="text-align:center">Escalation</th>
+        <th>Regola / Nota</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+// ── KPI DASHBOARD ─────────────────────────────────────────────────────────────
+function renderKPI() {
+  var rows = DATA.kpi_data.map(k => `
+    <tr>
+      <td style="font-weight:600">${k.nome}</td>
+      <td style="font-size:11px;color:var(--md)">${k.ruolo}</td>
+      <td>
+        <span class="kpi-obj">${k.obj1}</span>
+        <span class="kpi-obj">${k.obj2}</span>
+        <span class="kpi-obj">${k.obj3}</span>
+      </td>
+      <td>
+        <span class="kpi-metric">${k.kpi1}</span><br>
+        <span class="kpi-metric">${k.kpi2}</span><br>
+        <span class="kpi-metric">${k.kpi3}</span>
+      </td>
+    </tr>`).join('');
+
+  return `
+  <div class="sec-hdr">
+    <div><div class="sec-title">KPI Dashboard — Obiettivi & Metriche per Funzione</div>
+    <div class="sec-sub">3 obiettivi qualitativi + 3 KPI quantitativi per ruolo</div></div>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th>Persona</th><th>Ruolo</th><th>Obiettivi qualitativi</th><th>KPI quantitativi</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+// ── SC MATRIX ────────────────────────────────────────────────────────────────
+function renderSCMatrix() {
+  var roleHeaders = DATA.sc_roles.map(r =>
+    `<th style="writing-mode:vertical-rl;transform:rotate(180deg);padding:8px 4px;font-size:9px;min-width:26px;white-space:nowrap">${r}</th>`
+  ).join('');
+
+  var rows = DATA.sc_matrix.map(area => {
+    var hdr = `<tr><td colspan="${DATA.sc_roles.length+2}" class="area-hdr">${area.area}</td></tr>`;
+    var procRows = area.procs.map(p => {
+      var cells = DATA.sc_roles.map((r,i) => `<td style="text-align:center;padding:4px">${rp(p.vals[i]||'')}</td>`).join('');
+      return `<tr><td colspan="1"></td><td style="padding:6px 10px;font-size:11px">${p.name}</td>${cells}</tr>`;
+    }).join('');
+    return hdr + procRows;
+  }).join('');
+
+  return `
+  <div class="sec-hdr">
+    <div><div class="sec-title">SC · RACI Matrix — Operazioni & Supply Chain</div>
+    <div class="sec-sub">35 processi × 14 ruoli — 8 aree operative</div></div>
+  </div>
+  <div class="legend">
+    <div class="leg"><span class="rp rp-R">R</span> Responsible</div>
+    <div class="leg"><span class="rp rp-A">A</span> Accountable</div>
+    <div class="leg"><span class="rp rp-C">C</span> Consulted</div>
+    <div class="leg"><span class="rp rp-I">I</span> Informed</div>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th></th><th>Processo</th>${roleHeaders}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+// ── SC GUIDA ─────────────────────────────────────────────────────────────────
+function renderSCGuida() {
+  var ruoli = [
+    {tag:'R', tagCls:'alert-ok', title:'R – Responsible', desc:'Chi esegue materialmente il lavoro o il task.', rule:'Può essere più di uno per processo. Risponde ad A.'},
+    {tag:'A', tagCls:'alert-info', title:'A – Accountable', desc:'Chi è l\'unico responsabile finale del risultato. Firma e approva.', rule:'Solo UNO per ogni riga. Ha autorità decisionale.'},
+    {tag:'C', tagCls:'alert-warn', title:'C – Consulted', desc:'Chi fornisce input, pareri o competenze prima della decisione.', rule:'Comunicazione bidirezionale. Rallenta se abusato.'},
+    {tag:'I', tagCls:'alert-dec', title:'I – Informed', desc:'Chi deve essere aggiornato sul progresso/risultati.', rule:'Comunicazione unidirezionale. Solo dopo decisioni chiave.'},
+  ];
+  var best = [
+    {title:'Una sola A per riga', desc:'Ogni processo deve avere esattamente un Accountable.', rule:'Evita ambiguità decisionali.'},
+    {title:'Minimizza le C', desc:'Troppe consulenze rallentano i processi.', rule:'Mantieni max 3 C per riga.'},
+    {title:'Aggiorna periodicamente', desc:'Rivedere la matrice ogni 6 mesi o dopo riorganizzazioni.', rule:'Coinvolgi i team lead nella revisione.'},
+    {title:'Distingui R da A', desc:'L\'Accountable non deve necessariamente eseguire.', rule:'Separare responsabilità esecutiva da quella decisionale.'},
+  ];
+
+  return `
+  <div class="sec-hdr">
+    <div><div class="sec-title">SC · Guida all'utilizzo del Modello RACI</div>
+    <div class="sec-sub">Regole, ruoli e best practice per l'applicazione corretta</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;margin-bottom:16px">
+    ${ruoli.map(r => `
+    <div class="guida-card">
+      <div><span class="badge ${r.tagCls} guida-tag">${r.tag}</span></div>
+      <div class="guida-title">${r.title}</div>
+      <div class="guida-desc">${r.desc}</div>
+      <div class="guida-rule">→ ${r.rule}</div>
+    </div>`).join('')}
+  </div>
+  <div class="sec-hdr" style="margin-bottom:12px">
+    <div><div class="sec-title" style="font-size:14px">Best Practice</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">
+    ${best.map(b => `
+    <div class="guida-card">
+      <div class="guida-title">✓ ${b.title}</div>
+      <div class="guida-desc">${b.desc}</div>
+      <div class="guida-rule">→ ${b.rule}</div>
+    </div>`).join('')}
+  </div>`;
+}
+
+// ── SC DASHBOARD ─────────────────────────────────────────────────────────────
+function renderSCDash() {
+  var total = DATA.sc_dashboard.reduce((a,s)=>a+s.procs,0);
+
+  var rows = DATA.sc_dashboard.map(s => {
+    var pct = 100;
+    return `<tr>
+      <td style="font-size:14px;min-width:40px">${s.area.split(' ')[0]}</td>
+      <td style="font-weight:600">${s.area.slice(s.area.indexOf(' ')+1)}</td>
+      <td style="text-align:center;font-weight:700;font-family:var(--mono)">${s.procs}</td>
+      <td style="text-align:center"><span class="rp rp-R">${s.r}</span></td>
+      <td style="text-align:center"><span class="rp rp-A">${s.a}</span></td>
+      <td style="text-align:center">${badge('100%','alert-ok')}</td>
+    </tr>`;
+  }).join('');
+
+  return `
+  <div class="sec-hdr">
+    <div><div class="sec-title">SC · Dashboard Copertura RACI</div>
+    <div class="sec-sub">Statistiche per area operativa Supply Chain</div></div>
+  </div>
+  <div class="cards">
+    <div class="card"><div class="card-v" style="color:var(--ac)">${total}</div><div class="card-l">Processi totali SC</div></div>
+    <div class="card"><div class="card-v" style="color:var(--ac)">14</div><div class="card-l">Ruoli coinvolti</div></div>
+    <div class="card"><div class="card-v" style="color:var(--ac)">8</div><div class="card-l">Aree operative</div></div>
+    <div class="card" style="background:#D1FAE5"><div class="card-v" style="color:var(--gd)">100%</div><div class="card-l">Copertura R/A</div></div>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th></th><th>Area</th>
+        <th style="text-align:center">Processi</th>
+        <th style="text-align:center;color:#6EE7B7">R assegnati</th>
+        <th style="text-align:center;color:#93C5FD">A assegnati</th>
+        <th style="text-align:center">Copertura</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Statistica</th><th>Valore</th></tr></thead>
+      <tbody>
+        <tr><td>Totale processi mappati</td><td style="font-weight:700;font-family:var(--mono)">35</td></tr>
+        <tr><td>Ruoli aziendali coinvolti</td><td style="font-weight:700;font-family:var(--mono)">14</td></tr>
+        <tr><td>Aree operative coperte</td><td style="font-weight:700;font-family:var(--mono)">8</td></tr>
+        <tr><td>Processi con A definito</td><td>${badge('35 / 35','alert-ok')}</td></tr>
+        <tr><td>Processi con R definito</td><td>${badge('35 / 35','alert-ok')}</td></tr>
+      </tbody>
+    </table>
+  </div>`;
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+buildTabs();
+renderPage();
+</script>
+</body>
+</html>
